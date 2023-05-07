@@ -1,0 +1,535 @@
+---
+title: "Reproducible Data Analysis Project"
+author: "u3220939"
+date: "2023-04-27"
+output: html_document
+---
+
+# 1.) INTRODUCTION
+
+
+
+#### a) Basketball is a famous sport played around the world and has aslo been part of the Olympic Games since 1936. It requires two teams of five players each, trying to score points by throwing a ball through a basket, which is set up at 10 feet high on a backboard at each end of the court.
+
+In basketball, there are five positions, each with particular requirements and responsibilities. 
+
+Point guard (PG): Usually the smallest player on the team, is responsible for bringing the ball up the court and initiating the team's offense. Skills - quick, agile, passing.
+
+Shooting guard (SG): The shooting guard's role is to score points by shooting the ball from mid-range or beyond the three-point line. Skills - dribble, passing, scoring.
+
+Small forward (SF): The small forward is an adaptable player, making them an important part of both the offense and defense. Skills - shoot, pass, rebound. 
+
+Power forward (PF): The power forward is a strong and athletic player who plays close to the hoop.               Skills- rebounding, defending, scoring in the low post.
+
+Center (C): The center is the tallest player on the team and they need to be strong and have excellent footwork. Skills -  defending the rim, rebounding, and scoring in the low post.
+
+
+#### b)Scenario:
+
+As a data analyst for the Chicago Bulls, I have been assigned to find the best starting players for the team within a limited budget. The team's performance in the season before was not up to the level, and their budget for player contracts in the upcoming season is low compared to other teams in the league. My goal is to analyze the available data and find the best possible players for each position.
+
+#### c)Aim of the Project:
+
+The aim is to use data analysis to identify the five best players for each position (PG, SG, SF, PF, and C) on the Chicago Bulls team, basing the performance in the previous season (2018-19) and their bargain within the budget. The project aims to give operative insights to the team's general manager and make informed decisions regarding player contracts and team selection.
+
+#### d)Justification and Importance:
+
+The Chicago Bulls' performance in the previous season was below expectations, and the squad is looking for ways to improve its performance in the upcoming season. As a result, finding the best possible players for each position within the team's budget is key. This project is important as it utilizes data analysis to provide objective intuition to the team's innovative process and helps to scout players that can significantly contribute to the team's success. In addition to that, this project can serve as a guide for other teams in the NBA who are also looking to optimize their player selection process within a budget constraint.
+
+
+# 2.) Preparing the Data
+````{r}
+
+#loading the required libraries
+
+library(dplyr)
+library(tidyverse)
+library(readr)
+
+# reading the given data
+
+player_stats <- read_csv("2018-19_nba_player-statistics.csv")
+club_stats1 <- read_csv("2018-19_nba_team-statistics_1.csv")
+club_stats2 <- read_csv("2018-19_nba_team-statistics_2.csv")
+player_payroll <- read_csv("2019-20_nba_team-payroll.csv")
+player_salary <- read_csv("2018-19_nba_player-salaries.csv")
+view(player_stats)
+```
+
+## CLEANING the data
+```{r}
+
+str(player_stats)            #checking the structure of the data
+
+head(player_stats)           #checking the first 6 rows
+
+tail(player_stats)           #checking the last 6 rows
+
+dim(player_stats)
+
+summary(player_stats)
+```
+
+### Checking the Missing values from the data set.
+#### Missing values can occur in data due to various reasons such as incomplete data recording, measurement errors.
+
+
+```{r}
+player_stats%>% summarise_all(funs(sum(is.na(.)))) %>%
+ gather() %>% filter(value > 0)
+
+```
+#### After checking the dataset 5 variables out of 29 have missing values and all five key in analyising the players.
+
+
+```{r}
+player_stats <- player_stats %>% mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x))
+
+head(player_stats)
+tail(player_stats)
+```
+```{r}
+summary(player_stats)
+```
+## PLAYER GAME SCORE(PGS)
+### A player's game score is a metric used to evaluate their performance in a given game. It takes into account various statistics such as points scored, rebounds, assists, steals, blocks, and turnovers.
+
+### The resulting score provides a measure of the player's overall contribution to their team's performance in the game. A higher game score indicates a more productive and impactful performance by the player, while a lower score suggests a less effective performance. However, it's important to note that this metric doesn't account for intangible contributions such as leadership, hustle, and teamwork.
+
+
+### RENAMING the variables for better usage.
+```{r}
+player_stats <- rename(player_stats,
+ Position="Pos",
+Team='Tm',
+Games='G',
+Games_started='GS',
+Minutes_playerd='MP',
+Field_Goal='FG',
+Field_Goal_per='FG%',
+Free_Throw='FT',
+Of_Rebound='ORB',
+Df_Rebound='DRB',
+Assists='AST',
+Steals='STL',
+Blocks='BLK',
+Total_Rebounds='TRB',
+Player_Fouls='PF',
+Turn_Over='TOV',
+Points='PTS',
+Three_point_per='3P%',
+Two_point_per='2P%')
+
+
+```
+
+### Filtering the data based on the games played by the players in the season 2018-19
+
+```{r}
+player_stats <- subset(player_stats, Games > 20)
+head(player_stats)
+```
+#### The NBA season is long, with each team playing 82 games over several months. By selecting players who played more than 20 games in the previous season, we can ensure that we have a reasonable sample size to work with.
+#### Players who have played more than 20 games in the previous season are likely to have established a consistent level of performance, making it easier to identify trends or changes in their performance over time.
+
+
+## Caluculating the Player Game Score(PGS)
+
+```{r}
+player_stats <- player_stats %>% mutate(game_score=Points+Assists+Steals+Blocks-Turn_Over-Player_Fouls)
+player_stats <- player_stats %>% mutate(Player_Game_Score=game_score/Games)
+
+view(player_stats)
+```
+
+#### Sorting the data using the variable Player game score
+
+```{r}
+player_stats <- player_stats[order(-player_stats$Player_Game_Score),]
+
+# Convert Pos column to factor
+player_stats$Position <- as.factor(player_stats$Position)
+
+# Spliting Pos column into multiple rows
+player_stats <- player_stats %>% 
+  separate_rows(Position, sep = '-') %>% 
+  mutate(Position = trimws(Position))
+
+view(player_stats)
+```
+
+
+# 3.) Exploratory data Analysis
+
+### Frequency distribution
+
+```{r}
+ggplot(data = player_stats) +
+geom_histogram(mapping = aes(x = Age), colour = "black", fill = "coral",binwidth = 3)+
+ ggtitle("Age")
+```
+#### The graph represents the age distribution of players, with the x-axis indicating age and the y-axis showing the frequency of each age. It can be useful for making decisions regarding player recruitment and team composition.
+
+
+```{r}
+ggplot(player_stats, aes(x = Position, fill = Position)) +
+  geom_bar() +
+  ggtitle("Position") +
+  scale_fill_manual(values = c("deeppink", "darkgoldenrod", "blue", "coral", "brown"))
+
+```
+####
+
+
+```{r}
+ggplot(player_stats, aes(x = Points)) +
+  geom_histogram(binwidth = 100, colour = "black", fill = "darkolivegreen1") +
+  labs(x = "Points", y = "Frequency", title = "Points Scored")
+
+```
+#### 
+
+```{r}
+ggplot(player_stats, aes(x = Assists)) +
+  geom_histogram(binwidth = 50, colour = "black", fill = "aquamarine2") +
+  labs(x = "Assists", y = "Frequency", title = " Assists Distribution")
+ 
+```
+####
+
+```{r}
+ggplot(player_stats, aes(x = Blocks)) +
+  geom_histogram(binwidth = 17, colour = "black", fill = "brown") +
+  labs(x = "Blocks", y = "Frequency", title = "Defense Distribution")
+
+```
+####
+
+```{r}
+ggplot(player_stats, aes(x = Steals)) +
+  geom_histogram(binwidth = 15, colour = "black", fill = "burlywood3") +
+  labs(x = "Steals", y = "Frequency", title = "Distribution of Steals")
+
+```
+####
+
+
+
+## Comparing POSITION with some of the importanta attributes in basketball.
+
+```{r}
+ggplot(player_stats, aes(x = Position, y = Points, fill = Position)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Points by Position", x = "player positions", y = "Points") +
+  scale_fill_manual(values = c("#1F77B4", "#FF7F0E", "#2CA02C", "#D62728", "#9467BD"))
+
+```
+#### Shooting guard has contributed to more points and other positions have contributed equally.
+
+
+```{r}
+ggplot(player_stats, aes(x = Position, y = Assists, fill = Position)) +
+  geom_bar(stat = "identity", color = "black") +
+  xlab("Position") +
+  ylab("Assists") +
+   scale_fill_manual(values = c("cadetblue", "aquamarine4", "cyan3", "deepskyblue", "blue"))+
+  ggtitle("Assists by Positions")
+
+
+```
+
+
+### 
+
+```{r}
+ggplot(player_stats, aes(x = Position, y = Blocks, fill = Position)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("coral", "coral1", "coral2", "coral3", "coral4")) +
+  labs(title = "Blocks by Position", x = "Position", y = "Blocks")
+
+```
+#### 
+
+
+```{r}
+ggplot(player_stats, aes(x = Position, y = Steals, fill = Position)) +
+  geom_boxplot() +
+  scale_fill_manual(values = c("darkgoldenrod", "darkgoldenrod1", "darkgoldenrod2", "darkgoldenrod3", "darkgoldenrod4")) +
+  labs(title = "Steals by Position", x = "Position", y = "steals")
+
+```
+
+
+
+## PATTERNS-TRENDS of variables
+
+```{r}
+ggplot(player_stats, aes(x = Of_Rebound, y = Points)) +
+  geom_point() +
+  xlab("Offensive Rebounds") +
+  ylab("Points") +
+  ggtitle("Points vs Offensive Rebounds")
+
+
+```
+#### Each point on the scatter plot represents a player, with their offensive rebounds plotted on the x-axis and their points plotted on the y-axis. There is a positive correlation between points and offensive rebounds.
+
+
+```{r}
+  ggplot(player_stats, aes(x = Df_Rebound, y = Points)) +
+  geom_point() +
+  xlab("Defensive Rebounds") +
+  ylab("Points") +
+  ggtitle("Points vs Defensive Rebounds")
+```
+
+#### We can see if there is a pattern or correlation between the number of points a player scores and the number of defensive rebounds they make. There is a positive correlation between these two variables, it means that players who score more points also tend to have more defensive rebounds.
+
+
+## Target- Variable VS Variables
+
+```{r}
+ggplot(player_stats, aes(x = Points, y = Player_Game_Score, color = Position)) +
+  geom_point(size = 2.5) +
+   geom_smooth(method = "lm", color = "red", se = FALSE)+
+  xlab("Points") + ylab("Player Game Score") +
+  ggtitle("Relationship between Points and PGS by Position") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+```{r}
+ggplot(player_stats, aes(x = Steals, y = Player_Game_Score, color = Position)) +
+  geom_point(size = 2.5) +
+   geom_smooth(method = "lm", color = "dodgerblue", se = FALSE)+
+  xlab("Steals") + ylab("Player Game Score") +
+  ggtitle("Relationship between Steals and PGS by Position") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+#### The plot can help identify if there is a correlation between the two variables. There is a positive correlation, we would expect to see that players who make more steals tend to have higher player game scores. Each data point in the plot would represent a player's performance in terms of steals and player game score.
+
+
+
+
+
+
+
+
+```{r}
+ggplot(player_stats, aes(x = Blocks, y = Player_Game_Score, color = Position)) +
+  geom_point(size = 2.5) +
+   geom_smooth(method = "lm", color = "dodgerblue", se = FALSE)+
+  xlab("Blocks") + ylab("Player Game Score") +
+  ggtitle("Relationship between Blocks and PGS by Position") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+## Pattern Description
+
+### Statistical categories such as points, assists, blocks, steals play a crucial role in determining a player's performance and contribution to the team. 
+
+### Players who score more tend to have a higher number of points, indicating a positive correlation between Point game score and points.Players to contribute significantly to their team's point production and boost their overall efficiency.
+
+### Player Game score and assists are positively correlated, as players who excel in passing and decision-making can create scoring opportunities for their team. By contributing to the team's offensive efficiency, players can also positively impact their own efficiency rating.
+
+### Player game score and blocks may be positively related, especially on the defensive end. Players who have the ability to block shots can provide a defensive advantage by defending scoring opportunities and intercepting offensive plays. Blocked shots can lead to turnovers and transition opportunities, which can positively impact a player's overall score. 
+
+
+## Selecting the variable based on the analysis.
+
+```{r}
+Overall_player <- player_stats %>% select(player_name,Position, Games,
+                                          Three_point_per, Two_point_per,
+                                          Assists,Steals,Blocks,Total_Rebounds, Points, Player_Game_Score, game_score)
+
+
+```
+
+
+
+
+
+
+# 4.) Data Modelling
+
+#### Data modeling is the process of creating a mathematical representation of a real-world system or situation, with the aim of understanding or predicting its behavior. It involves selecting and defining variables that are relevant to the system being studied, and using statistical methods to analyze the relationships between these variables and their effect on the outcome of interest.
+
+#### The aim of data modeling in the context of player selection in NBA is to identify and analyze the statistical metrics that are most relevant in evaluating a player's performance and predicting their future contributions to a team. 
+
+#### Once we had performed data visualization, we determined certain metrics that seemed significant in assessing the performance of players. These metrics were treated as the independent variables in our linear regression model, with the efficiency metric being the dependent variable.
+
+#### The analysis aims to evaluate the effectiveness of the selected variables in predicting player efficiency. A close match between the observed and predicted values would indicate that the identified metrics are reliable indicators of player performance and can aid in determining their skill level.
+
+```{r}
+library(broom)
+fitted <- lm(data= Overall_player,Player_Game_Score~Points++Assists+Blocks)
+tidy(fitted,conf.int=TRUE)
+
+```
+
+### The estimated intercept is 2.24, which is the Player Game score.
+
+### A unit increase in points, player game score increases by 0.01
+
+### A unit increase in assists, player game score increases by 0.01
+
+### A unit increase in blocks, player game score decreases by 0.01
+
+```{r}
+summary(fitted)
+
+```
+### What we can observe from the model
+
+#### RSE measures the deviation of predicted Player game score from observed values, with a value of 2.614 in this model.
+#### Multiple R-squared indicates that about 82% of the variation in game score per game.
+#### The F-statistic of 841.9 and its associated p-value of p < 2.2e-16 provide strong evidence to reject the null hypothesis that all the regression coefficients are zero.
+#### Overall, the model is statistically significant in explaining the variability in the dependent variable.
+
+
+
+```{r}
+Overall_player$predicted <- predict(fitted)
+
+Overall_player$predicted <- round(Overall_player$predicted,2)
+
+Overall_player <- Overall_player %>% arrange(desc(Overall_player$Player_Game_Score))
+head(Overall_player)
+```
+
+# 5.) Player Recommendations
+
+
+```{r}
+#merging the players stats with salary.
+stats_with_salary <- merge(Overall_player,player_salary,by="player_name")
+
+
+stats_with_salary <- stats_with_salary %>% arrange(desc(stats_with_salary$Player_Game_Score))
+
+head(stats_with_salary)
+```
+```{r}
+final_data <- stats_with_salary %>% select(player_name,player_id,Position,
+ Three_point_per,Two_point_per,
+Points,
+Assists,
+Blocks,
+Steals,
+salary,
+Player_Game_Score)
+
+head(final_data)
+```
+### Selecting the player
+
+```{r}
+Selection_final <- final_data %>% select(player_name,
+ Position, Points, Assists,
+Player_Game_Score,
+salary)
+head(Selection_final,20)
+```
+
+```{r}
+unique(Selection_final$Position)
+
+```
+
+## Selecting one player for each position
+
+
+
+```{r}
+Selection_final %>% filter(Position=="SG") %>% arrange(desc(Player_Game_Score))
+```
+
+
+```{r}
+Selection_final %>% filter(Position=="C") %>% arrange(desc(Player_Game_Score))
+```
+
+
+
+```{r}
+Selection_final %>% filter(Position=="SF") %>% arrange(desc(Player_Game_Score))
+```
+
+
+```{r}
+Selection_final %>% filter(Position=="PF") %>% arrange(desc(Player_Game_Score))
+
+```
+
+
+```{r}
+Selection_final %>% filter(Position=="PG") %>% arrange(desc(Player_Game_Score))
+
+```
+
+
+
+# CHICAGO BULLS 5 players for the season 2019-20
+
+
+
+**SHOOTING GUARD**
+
+### Playername : BRADLEY BEAL
+#### Points    :2099
+#### Assists   :  448
+#### Player_Game_Score :27
+
+**POINT GUARD**
+
+#### Playername : JAMES HARDEN
+#### Points     :2818
+#### Assists    :586
+#### Player_Game_Score     :38
+
+**CENTER**
+
+#### Playername : ANTONY DAVIES
+#### Points     :1452
+#### Assists    :218
+#### Player_Game_Score     :29
+
+**POWER FORWARD**
+
+#### Playername : GIANNIS ANTETOKOUNMPO
+#### Points     :1994   
+#### Assists    :424
+#### Player_Game_Score     :29
+
+**SMALL FORWARD**
+
+#### Playername : LEBRON JAMES
+#### Points     :1505
+#### Assists    :454
+#### Player_Game_Score     :32
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
